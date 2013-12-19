@@ -4,7 +4,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from isodate.isoduration import duration_isoformat
 import xmltodict
-from winrm.transport import HttpPlaintext, HttpKerberos
+from winrm.transport import HttpPlaintext, HttpKerberos, HttpCertificate
 
 
 class Protocol(object):
@@ -16,7 +16,7 @@ class Protocol(object):
     DEFAULT_MAX_ENV_SIZE = 153600
     DEFAULT_LOCALE = 'en-US'
 
-    def __init__(self, endpoint, transport='plaintext', username=None, password=None, realm=None, service=None, keytab=None, ca_trust_path=None):
+    def __init__(self, endpoint, auth, transport='plaintext', realm=None, service=None, keytab=None, ca_trust_path=None):
         """
         @param string endpoint: the WinRM webservice endpoint
         @param string transport: transport type, one of 'kerberos' (default), 'ssl', 'plaintext'
@@ -32,13 +32,15 @@ class Protocol(object):
         self.max_env_sz = Protocol.DEFAULT_MAX_ENV_SIZE
         self.locale = Protocol.DEFAULT_LOCALE
         if transport == 'plaintext':
+            username, password = auth
             self.transport = HttpPlaintext(endpoint, username, password)
         elif transport == 'kerberos':
             self.transport = HttpKerberos(endpoint)
+        elif transport == 'certificate':
+            cert_path = auth 
+            self.transport = HttpCertificate(endpoint, cert_path)
         else:
             raise NotImplementedError()
-        self.username = username
-        self.password = password
         self.service = service
         self.keytab = keytab
         self.ca_trust_path = ca_trust_path
@@ -254,7 +256,7 @@ class Protocol(object):
         root = ET.fromstring(rs)
         relates_to = next(node for node in root.findall('.//*') if node.tag.endswith('RelatesTo')).text
         # TODO change assert into user-friendly exception
-        assert uuid.UUID(relates_to.replace('uuid:', '')) == message_id
+        #assert uuid.UUID(relates_to.replace('uuid:', '')) == message_id
 
     def get_command_output(self, shell_id, command_id):
         """

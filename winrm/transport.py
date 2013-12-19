@@ -11,13 +11,16 @@ except ImportError:
 
 is_py2 = sys.version[0] == '2'
 if is_py2:
-    from urllib2 import Request, URLError, HTTPError, HTTPBasicAuthHandler, HTTPPasswordMgrWithDefaultRealm
+    from urllib2 import Request, URLError, HTTPError, HTTPBasicAuthHandler, HTTPPasswordMgrWithDefaultRealm, HTTPSHandler
     from urllib2 import urlopen, build_opener, install_opener
     from urlparse import urlparse
+    import httplib
 else:
     from urllib.request import Request, URLError, HTTPError, HTTPBasicAuthHandler, HTTPPasswordMgrWithDefaultRealm
     from urllib.request import urlopen, build_opener, install_opener
     from urllib.parse import urlparse
+
+
 
 
 class HttpTransport(object):
@@ -41,6 +44,77 @@ class HttpTransport(object):
         # here we should remove handler for Negotiate/NTLM negotiation
         # but maybe leave original credentials
         pass
+
+import suds
+
+class HTTPSClientCertTransport(suds.transport.http.HttpTransport):
+    def __init__(self, key, cert, *args, **kwargs):
+        suds.transport.http.HttpTransport.__init__(self, *args, **kwargs)
+        self.key = key
+        self.cert = cert
+
+    def u2open(self, u2request):
+        """
+        Open a connection.
+        @param u2request: A urllib2 request.
+        @type u2request: urllib2.Requet.
+        @return: The opened file-like urllib2 object.
+        @rtype: fp
+        """
+        tm = self.options.timeout
+        url = build_opener(HTTPSClientAuthHandler(self.key, self.cert))  
+        if self.u2ver() < 2.6:
+            socket.setdefaulttimeout(tm)
+            return url.open(u2request)
+        else:
+            return url.open(u2request, timeout=tm)
+
+class HTTPSClientAuthHandler(HTTPSHandler):  
+    def __init__(self, key, cert):  
+        HTTPSHandler.__init__(self)  
+        self.key = key  
+        self.cert = cert  
+
+    def https_open(self, req):  
+        #Rather than pass in a reference to a connection class, we pass in  
+        # a reference to a function which, for all intents and purposes,  
+        # will behave as a constructor 
+        return self.do_open(self.getConnection, req) 
+
+    def getConnection(self, host, timeout=300):  
+        return httplib.HTTPSConnection(host, key_file=self.key, cert_file=self.cert)  
+
+
+class HttpCertificate(object):
+    def __init__(self, endpoint, cert_path):
+        self.endpoint = endpoint
+        self.cert_path = cert_path
+  
+    def basic_auth_only(self):
+        #here we should remove handler for any authentication handlers other than basic
+        # but maybe leave original credentials
+
+        # auths = @httpcli.www_auth.instance_variable_get('@authenticator')
+        # auths.delete_if {|i| i.scheme !~ /basic/i}
+        # drop all variables in auths if they not contains "basic" as insensitive.
+        pass
+
+    def no_sspi_auth(self):
+        # here we should remove handler for Negotiate/NTLM negotiation
+        # but maybe leave original credentials
+        pass
+
+    def send_message(self, message):
+        headers = {'Content-Type' : 'application/soap+xml;charset=UTF-8',
+                   'Content-Length' : len(message),
+                   'User-Agent' : 'Python WinRM client'}
+        response = ""
+        transport = HTTPSClientCertTransport(self.cert_path, self.cert_path)
+        response = transport.u2open(self.endpoint)
+        #f = open("dummy.data", "rb")
+        #response = f.read()
+        #f.close()
+        return response
 
 
 class HttpPlaintext(HttpTransport):

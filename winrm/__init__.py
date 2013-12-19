@@ -14,10 +14,9 @@ class Response(object):
 
 class Session(object):
     #TODO implement context manager methods
-    def __init__(self, url, auth):
+    def __init__(self, url, auth, transport = "plaintext"):
         #TODO convert short urls into well-formed endpoint
-        username, password = auth
-        self.protocol = Protocol(url, username=username, password=password)
+        self.protocol = Protocol(url, auth, transport)
 
     def run_cmd(self, command, args=()):
         #TODO optimize perf. Do not call open/close shell every time
